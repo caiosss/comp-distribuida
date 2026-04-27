@@ -1,0 +1,93 @@
+services:
+  mysql:
+    image: mysql:5.7
+    container_name: mysql
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wpuser
+      MYSQL_PASSWORD: wppass
+      MYSQL_ROOT_PASSWORD: rootpass
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - wpnet
+
+  wordpress1:
+    image: wordpress:5.4.2-php7.2-apache
+    container_name: wordpress1
+    depends_on:
+      - mysql
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD: wppass
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - ./wordpress_data:/var/www/html
+    networks:
+      - wpnet
+
+  wordpress2:
+    image: wordpress:5.4.2-php7.2-apache
+    container_name: wordpress2
+    depends_on:
+      - mysql
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD: wppass
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - ./wordpress_data:/var/www/html
+    networks:
+      - wpnet
+
+  wordpress3:
+    image: wordpress:5.4.2-php7.2-apache
+    container_name: wordpress3
+    depends_on:
+      - mysql
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD: wppass
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - ./wordpress_data:/var/www/html
+    networks:
+      - wpnet
+
+  nginx:
+    image: nginx:1.19.0
+    container_name: nginx
+    depends_on:
+      - wordpress1
+      - wordpress2
+      - wordpress3
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./wordpress_data:/usr/share/nginx/html
+    networks:
+      - wpnet
+  
+  locust:
+    image: locustio/locust
+    depends_on:
+      - nginx
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./locust:/mnt/locust
+    command: >
+      -f /mnt/locust/locustfile.py
+      --host=http://nginx
+    networks:
+      - wpnet
+
+volumes:
+  mysql_data:
+
+networks:
+  wpnet:
