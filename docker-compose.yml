@@ -11,75 +11,67 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - wpnet
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-  wordpress1:
+  wordpress:
     image: wordpress:5.4.2-php7.2-apache
-    container_name: wordpress1
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     environment:
       WORDPRESS_DB_HOST: mysql:3306
       WORDPRESS_DB_USER: wpuser
       WORDPRESS_DB_PASSWORD: wppass
       WORDPRESS_DB_NAME: wordpress
     volumes:
-      - ./wordpress_data:/var/www/html
+      - wordpress_data:/var/www/html
     networks:
       - wpnet
-
-  wordpress2:
-    image: wordpress:5.4.2-php7.2-apache
-    container_name: wordpress2
-    depends_on:
-      - mysql
-    environment:
-      WORDPRESS_DB_HOST: mysql:3306
-      WORDPRESS_DB_USER: wpuser
-      WORDPRESS_DB_PASSWORD: wppass
-      WORDPRESS_DB_NAME: wordpress
-    volumes:
-      - ./wordpress_data:/var/www/html
-    networks:
-      - wpnet
-
-  wordpress3:
-    image: wordpress:5.4.2-php7.2-apache
-    container_name: wordpress3
-    depends_on:
-      - mysql
-    environment:
-      WORDPRESS_DB_HOST: mysql:3306
-      WORDPRESS_DB_USER: wpuser
-      WORDPRESS_DB_PASSWORD: wppass
-      WORDPRESS_DB_NAME: wordpress
-    volumes:
-      - ./wordpress_data:/var/www/html
-    networks:
-      - wpnet
+    # Número de instâncias é controlado via:
+    #   docker compose up --scale wordpress=N
+    # Exemplos:
+    #   docker compose up --scale wordpress=1
+    #   docker compose up --scale wordpress=2
+    #   docker compose up --scale wordpress=3
 
   nginx:
     image: nginx:1.19.0
     container_name: nginx
     depends_on:
-      - wordpress1
-      - wordpress2
-      - wordpress3
+      - wordpress
     ports:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./wordpress_data:/usr/share/nginx/html
     networks:
       - wpnet
-  
+
   locust:
     image: locustio/locust
+    container_name: locust
     depends_on:
       - nginx
     ports:
       - "8089:8089"
     volumes:
       - ./locust:/mnt/locust
+    # Modo UI: acesse http://localhost:8089 para configurar usuários interativamente
+    # e exportar CSVs manualmente pelo painel.
+    #
+    # Modo headless (automatizado), descomente e ajuste:
+    #   command: >
+    #     -f /mnt/locust/locustfile.py
+    #     --host=http://nginx
+    #     --headless
+    #     -u 100
+    #     -r 10
+    #     --run-time 60s
+    #     --csv=/mnt/locust/resultados/resultado_100u
     command: >
       -f /mnt/locust/locustfile.py
       --host=http://nginx
@@ -88,6 +80,7 @@ services:
 
 volumes:
   mysql_data:
+  wordpress_data:
 
 networks:
   wpnet:

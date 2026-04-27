@@ -1,12 +1,59 @@
-from locust import HttpUser, task, between
+import os
+from locust import HttpUser, task, between, TaskSet
 
-class WebsiteUser(HttpUser):
-    wait_time = between(1, 3)
+# =============================================================================
+# URLs dos posts por cenário — já configuradas com os slugs reais
+# =============================================================================
 
-    # @task
-    # def index(self):
-    #     self.client.get("/")
+URL_CENARIO_1 = "/2026/04/27/resenhas/"           # post com imagem ~1MB
+URL_CENARIO_2 = "/2026/04/27/this-is-elon-musk/"  # post com texto ~400KB
+URL_CENARIO_3 = "/2026/04/27/13/"                 # post com imagem ~300KB
+
+
+class CenarioImagem1MB(TaskSet):
+    """Cenário 1: post com imagem de ~1MB."""
 
     @task
-    def post_page(self):
-        self.client.get("/?p=1")
+    def acessar_post(self):
+        self.client.get(URL_CENARIO_1, name="[Cenario 1] Imagem 1MB")
+
+
+class CenarioTexto400KB(TaskSet):
+    """Cenário 2: post com texto de ~400KB."""
+
+    @task
+    def acessar_post(self):
+        self.client.get(URL_CENARIO_2, name="[Cenario 2] Texto 400KB")
+
+
+class CenarioImagem300KB(TaskSet):
+    """Cenário 3: post com imagem de ~300KB."""
+
+    @task
+    def acessar_post(self):
+        self.client.get(URL_CENARIO_3, name="[Cenario 3] Imagem 300KB")
+
+
+# =============================================================================
+# Seleção do cenário via variável de ambiente CENARIO (1, 2 ou 3).
+# O run_tests.sh passa essa variável automaticamente em cada execução.
+# Para rodar manualmente: CENARIO=2 locust -f locustfile.py --host=...
+# =============================================================================
+
+_CENARIOS = {
+    "1": CenarioImagem1MB,
+    "2": CenarioTexto400KB,
+    "3": CenarioImagem300KB,
+}
+
+_cenario_escolhido = os.environ.get("CENARIO", "1")
+
+if _cenario_escolhido not in _CENARIOS:
+    raise ValueError(
+        f"Variável CENARIO inválida: '{_cenario_escolhido}'. Use 1, 2 ou 3."
+    )
+
+
+class UsuarioAtivo(HttpUser):
+    wait_time = between(1, 3)
+    tasks = [_CENARIOS[_cenario_escolhido]]
