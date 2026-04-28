@@ -1,9 +1,12 @@
 #!/bin/bash
 # =============================================================================
 # run_tests.sh — Executa todas as combinações de teste automaticamente:
-#   - 3 cenários de conteúdo (selecionados via variável CENARIO no locustfile)
+#   - 4 cenários de conteúdo (1-3 individuais + 4 híbrido round-robin)
 #   - 3 quantidades de usuários: 10, 100, 1000
 #   - 3 quantidades de instâncias WordPress: 1, 3, 5
+#
+# Duração: ramp_up + max(5, ramp_up), garantindo mínimo de 5s em carga máxima.
+#   Ramp-up (s) = ceil(usuarios / spawn_rate)
 #
 # Uso:
 #   chmod +x run_tests.sh
@@ -14,8 +17,7 @@ set -e
 
 USUARIOS=(10 100 1000)
 INSTANCIAS=(1 3 5)
-CENARIOS=(1 2 3)
-DURACAO="60s"
+CENARIOS=(1 2 3 4)
 SPAWN_RATE=10
 RESULTADOS_DIR="./locust/resultados"
 
@@ -33,8 +35,14 @@ for instancias in "${INSTANCIAS[@]}"; do
 
     for cenario in "${CENARIOS[@]}"; do
         for usuarios in "${USUARIOS[@]}"; do
+            ramp_up=$(( (usuarios + SPAWN_RATE - 1) / SPAWN_RATE ))
+            sustained=$(( ramp_up > 5 ? ramp_up : 5 ))
+            DURACAO="$((ramp_up + sustained))s"
+
             PREFIXO="cenario${cenario}_${instancias}inst_${usuarios}u"
-            echo " Rodando: cenário $cenario | $instancias instância(s) | $usuarios usuários..."
+            echo ""
+            echo " Rodando : cenário $cenario | $instancias instância(s) | $usuarios usuários"
+            echo " Ramp-up : ${ramp_up}s  |  Máx: ${sustained}s  |  Total: ${DURACAO}"
 
             docker compose run --rm \
                 -e CENARIO="$cenario" \
@@ -45,9 +53,10 @@ for instancias in "${INSTANCIAS[@]}"; do
                 -u "$usuarios" \
                 -r "$SPAWN_RATE" \
                 --run-time "$DURACAO" \
-                --csv="/mnt/locust/resultados/${PREFIXO}" \
-                --csv-full-history
+                --csv="/mnt/locust/resultados/${PREFIXO}"
 
+            rm -f "${RESULTADOS_DIR}/${PREFIXO}_failures.csv"
+            rm -f "${RESULTADOS_DIR}/${PREFIXO}_exceptions.csv"
             echo " Salvo: ${PREFIXO}_stats.csv"
             sleep 5
         done
