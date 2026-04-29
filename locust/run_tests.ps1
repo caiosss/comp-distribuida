@@ -15,7 +15,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$USUARIOS       = @(500, 2000, 4000)
+$USUARIOS       = @(100, 200, 300)
 $INSTANCIAS     = @(1, 3, 5)
 $CENARIOS       = @(1, 2, 3, 4)
 $SPAWN_RATE     = 50
@@ -30,9 +30,18 @@ foreach ($instancias in $INSTANCIAS) {
     Write-Host ""
     Write-Host ">>> Subindo $instancias instancia(s) do WordPress..."
     docker compose up -d --scale wordpress=$instancias mysql nginx wordpress | Out-Null
-    $estabilizacao = if ($instancias -eq 1) { 20 } else { 60 }
-    Write-Host "    Aguardando estabilizacao (${estabilizacao}s)..."
-    Start-Sleep -Seconds $estabilizacao
+
+    Write-Host "    Aguardando WordPress responder (max 5min)..."
+    $pronto = $false
+    for ($i = 0; $i -lt 60; $i++) {
+        Start-Sleep -Seconds 5
+        try {
+            $r = Invoke-WebRequest -Uri "http://localhost/" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+            if ($r.StatusCode -lt 500) { $pronto = $true; break }
+        } catch { }
+    }
+    if ($pronto) { Write-Host "    WordPress pronto." }
+    else         { Write-Host "    AVISO: WordPress pode nao estar pronto." }
 
     foreach ($usuarios in $USUARIOS) {
         foreach ($cenario in $CENARIOS) {
