@@ -32,12 +32,6 @@ services:
       - wordpress_data:/var/www/html
     networks:
       - wpnet
-    # Número de instâncias é controlado via:
-    #   docker compose up --scale wordpress=N
-    # Exemplos:
-    #   docker compose up --scale wordpress=1
-    #   docker compose up --scale wordpress=2
-    #   docker compose up --scale wordpress=3
 
   nginx:
     image: nginx:1.19.0
@@ -56,25 +50,9 @@ services:
     container_name: locust
     depends_on:
       - nginx
-    ports:
-      - "8089:8089"
     volumes:
       - ./locust:/mnt/locust
-    # Modo UI: acesse http://localhost:8089 para configurar usuários interativamente
-    # e exportar CSVs manualmente pelo painel.
-    #
-    # Modo headless (automatizado), descomente e ajuste:
-    #   command: >
-    #     -f /mnt/locust/locustfile.py
-    #     --host=http://nginx
-    #     --headless
-    #     -u 100
-    #     -r 10
-    #     --run-time 60s
-    #     --csv=/mnt/locust/resultados/resultado_100u
-    command: >
-      -f /mnt/locust/locustfile.py
-      --host=http://nginx
+    working_dir: /mnt/locust
     networks:
       - wpnet
 
