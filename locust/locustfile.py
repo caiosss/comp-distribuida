@@ -6,9 +6,9 @@ from locust import HttpUser, task, between, TaskSet
 # URLs dos posts por cenário — já configuradas com os slugs reais
 # =============================================================================
 
-URL_CENARIO_1 = "/2026/04/27/resenhas/"           # post com imagem ~1MB
-URL_CENARIO_2 = "/2026/04/27/this-is-elon-musk/"  # post com texto ~400KB
-URL_CENARIO_3 = "/2026/04/27/13/"                 # post com imagem ~300KB
+URL_CENARIO_1 = "/2026/04/28/teste-forte/"           # post com imagem ~1MB
+URL_CENARIO_2 = "/2026/04/28/teste-fraco/"          # post com texto ~400KB
+URL_CENARIO_3 = "/2026/04/28/teste-medio/"                 # post com imagem ~300KB
 
 
 class CenarioImagem1MB(TaskSet):

@@ -60,6 +60,10 @@ services:
       - "8089:8089"
     volumes:
       - ./locust:/mnt/locust
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
     # Modo UI: acesse http://localhost:8089 para configurar usuários interativamente
     # e exportar CSVs manualmente pelo painel.
     #

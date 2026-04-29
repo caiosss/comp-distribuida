@@ -1,50 +1,50 @@
 # =============================================================================
 # run_tests.ps1 — Executa todas as combinações de teste automaticamente:
 #   - 4 cenários de conteúdo (1-3 individuais + 4 híbrido round-robin)
-#   - 3 quantidades de usuários: 100, 4000, 8000
+#   - 3 quantidades de usuários: 500, 2000, 4000
 #   - 3 quantidades de instâncias WordPress: 1, 3, 5
 #
-# Spawn rate: 200 usuários/s
-# Duração: ramp_up + max(5, ramp_up), garantindo mínimo de 5s em carga máxima.
+# Spawn rate: 50 usuários/s
+# Duração: ramp_up + max(30, ramp_up), garantindo mínimo de 30s em carga máxima.
 #   Ramp-up (s) = ceil(usuarios / spawn_rate)
-#   Exemplo com 8000u e spawn 200/s → ramp-up = 40s → run_time = 80s
+#   Exemplo com 4000u e spawn 50/s → ramp-up = 80s → run_time = 110s
 #
 # Uso (PowerShell):
-#   .\run_tests.ps1
+#   .\locust\run_tests.ps1
 # =============================================================================
 
 $ErrorActionPreference = "Stop"
 
-$USUARIOS       = @(100, 4000, 8000)
+$USUARIOS       = @(500, 2000, 4000)
 $INSTANCIAS     = @(1, 3, 5)
 $CENARIOS       = @(1, 2, 3, 4)
-$SPAWN_RATE     = 200
+$SPAWN_RATE     = 50
 $RESULTADOS_DIR = "./locust/resultados"
+
+$totalTestes  = $INSTANCIAS.Count * $CENARIOS.Count * $USUARIOS.Count
+$testeAtual   = 0
 
 New-Item -ItemType Directory -Force -Path $RESULTADOS_DIR | Out-Null
 
 foreach ($instancias in $INSTANCIAS) {
     Write-Host ""
-    Write-Host "======================================================"
-    Write-Host " Subindo $instancias instancia(s) do WordPress..."
-    Write-Host "======================================================"
+    Write-Host ">>> Subindo $instancias instancia(s) do WordPress..."
+    docker compose up -d --scale wordpress=$instancias mysql nginx wordpress | Out-Null
+    $estabilizacao = if ($instancias -eq 1) { 20 } else { 60 }
+    Write-Host "    Aguardando estabilizacao (${estabilizacao}s)..."
+    Start-Sleep -Seconds $estabilizacao
 
-    docker compose up -d --scale wordpress=$instancias mysql nginx wordpress
+    foreach ($usuarios in $USUARIOS) {
+        foreach ($cenario in $CENARIOS) {
+            $testeAtual++
 
-    Write-Host " Aguardando estabilizacao (20s)..."
-    Start-Sleep -Seconds 20
+            $rampUp    = [math]::Ceiling($usuarios / $SPAWN_RATE)
+            $sustained = [math]::Max(30, $rampUp)
+            $DURACAO   = "$($rampUp + $sustained)s"
+            $PREFIXO   = "cenario${cenario}_${instancias}inst_${usuarios}u"
 
-    foreach ($cenario in $CENARIOS) {
-        foreach ($usuarios in $USUARIOS) {
-
-            $rampUp   = [math]::Ceiling($usuarios / $SPAWN_RATE)
-            $sustained = [math]::Max(5, $rampUp)
-            $DURACAO  = "$($rampUp + $sustained)s"
-
-            $PREFIXO = "cenario${cenario}_${instancias}inst_${usuarios}u"
             Write-Host ""
-            Write-Host " Rodando : cenario $cenario | $instancias instancia(s) | $usuarios usuarios"
-            Write-Host " Ramp-up : ${rampUp}s  |  Max: ${sustained}s  |  Total: $DURACAO"
+            Write-Host "[$testeAtual/$totalTestes] Iniciando: cenario $cenario | ${instancias} inst | ${usuarios}u | duracao ${DURACAO}"
 
             docker compose run --rm `
                 -e CENARIO="$cenario" `
@@ -55,23 +55,28 @@ foreach ($instancias in $INSTANCIAS) {
                 -u $usuarios `
                 -r $SPAWN_RATE `
                 --run-time $DURACAO `
-                --csv="/mnt/locust/resultados/${PREFIXO}"
+                --csv="/mnt/locust/resultados/${PREFIXO}" | Out-Null
 
             Remove-Item -Force -ErrorAction SilentlyContinue "${RESULTADOS_DIR}/${PREFIXO}_failures.csv"
             Remove-Item -Force -ErrorAction SilentlyContinue "${RESULTADOS_DIR}/${PREFIXO}_exceptions.csv"
-            Write-Host " Salvo: ${PREFIXO}_stats.csv"
-            Start-Sleep -Seconds 5
+
+            $csvExiste = Test-Path "${RESULTADOS_DIR}/${PREFIXO}_stats.csv"
+            if ($csvExiste) {
+                Write-Host "    Concluido. CSV salvo: ${PREFIXO}_stats.csv"
+            } else {
+                Write-Host "    AVISO: CSV nao gerado para ${PREFIXO} - verifique o Docker."
+            }
+
+            Start-Sleep -Seconds 10
         }
     }
 
     Write-Host ""
-    Write-Host " Derrubando instancias do WordPress..."
-    docker compose stop wordpress
-    docker compose rm -f wordpress
+    Write-Host ">>> Derrubando instancias do WordPress..."
+    docker compose stop wordpress | Out-Null
+    docker compose rm -f wordpress | Out-Null
 }
 
 Write-Host ""
-Write-Host "======================================================"
-Write-Host " Todos os testes concluidos!"
-Write-Host " Resultados em: $RESULTADOS_DIR"
-Write-Host "======================================================"
+Write-Host ">>> Todos os $totalTestes testes concluidos. Resultados em: $RESULTADOS_DIR"
+
