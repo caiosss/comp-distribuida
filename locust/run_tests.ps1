@@ -1,13 +1,13 @@
 # =============================================================================
 # run_tests.ps1 — Executa todas as combinações de teste automaticamente:
 #   - 4 cenários de conteúdo (1-3 individuais + 4 híbrido round-robin)
-#   - 3 quantidades de usuários: 100, 4000, 8000
+#   - 3 quantidades de usuários: 100, 900, 2000
 #   - 3 quantidades de instâncias WordPress: 1, 3, 5
 #
-# Spawn rate: 200 usuários/s
+# Spawn rate: 100 usuários/s
 # Duração: ramp_up + max(5, ramp_up), garantindo mínimo de 5s em carga máxima.
 #   Ramp-up (s) = ceil(usuarios / spawn_rate)
-#   Exemplo com 8000u e spawn 200/s → ramp-up = 40s → run_time = 80s
+#   Exemplo com 2000u e spawn 100/s → ramp-up = 20s → run_time = 40s
 #
 # Uso (PowerShell):
 #   .\run_tests.ps1
@@ -15,10 +15,10 @@
 
 $ErrorActionPreference = "Stop"
 
-$USUARIOS       = @(100, 4000, 8000)
+$USUARIOS       = @(100, 200, 900)
 $INSTANCIAS     = @(1, 3, 5)
 $CENARIOS       = @(1, 2, 3, 4)
-$SPAWN_RATE     = 200
+$SPAWN_RATE     = 100
 $RESULTADOS_DIR = "./locust/resultados"
 
 New-Item -ItemType Directory -Force -Path $RESULTADOS_DIR | Out-Null
